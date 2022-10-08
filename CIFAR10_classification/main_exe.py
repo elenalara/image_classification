@@ -45,13 +45,6 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
-    "--num_workers",
-    type=int,
-    nargs='?',
-    help='The number of workers in Dataloader. Default is 12',
-    default=12,
-)
-parser.add_argument(
     "--batch_size",
     type=int,
     nargs='?',
@@ -93,15 +86,11 @@ if __name__ == "__main__":
 
     if args.task == "train":
         logging.info(f"Training the neural network model")
-        if args.num_workers == 0:
-            print('Single-process loading')
-        elif args.num_workers > 0:
-            print('Multi-process loading')
         writer = SummaryWriter('runs/train/' + args.network + suffix + f'lr{args.lr}dataaug')
         writer.add_text('count', f"Total image count: {len(train_ds)+len(test_ds)}")
         writer.flush()
         since = time.time()
-        num_each = model.train(train_ds, test_ds, device, class_names, args.num_workers, args.batch_size, args.max_epochs, writer, args.progress, args.pretrained, args.finetune, args.network, model_name, args.lr)
+        num_each = model.train(train_ds, test_ds, device, class_names, args.batch_size, args.max_epochs, writer, args.progress, args.pretrained, args.finetune, args.network, model_name, args.lr)
         time_elapsed = time.time() - since
         writer.add_figure('Label counts', tools.plot_each(num_each))
         writer.add_text('train', f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
