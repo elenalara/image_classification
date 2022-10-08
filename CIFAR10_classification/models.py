@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from monai.networks.nets import DenseNet121, DenseNet169, DenseNet201, EfficientNetBN
+from monai.networks.nets import DenseNet201, EfficientNetBN
 import monai.transforms as transforms
 from monai.metrics import ROCAUCMetric
 from monai.data import decollate_batch
@@ -17,15 +17,13 @@ import settings
 
 class MyNeuralNetwork:
 
-    def train(self, train_ds, test_ds, device, class_names, num_workers, batch_size, max_epochs, writer, progress, pretrained, finetune, type_net, model_name, lr, save_model=True):
+    def train(self, train_ds, test_ds, device, class_names, batch_size, max_epochs, writer, progress, pretrained, finetune, type_net, model_name, lr, save_model=True):
         # Defining train and test sets
-        train_loader = torch.utils.data.DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-        test_loader = torch.utils.data.DataLoader(test_ds, batch_size=batch_size, num_workers=num_workers)
+        train_loader = torch.utils.data.DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=10)
+        test_loader = torch.utils.data.DataLoader(test_ds, batch_size=batch_size, num_workers=10)
         
         # Neural network, loss function, optimizer
         loss_function = torch.nn.CrossEntropyLoss()
-#         loss_function = torch.nn.L1Loss()
-#         loss_function = torch.nn.MSELoss()
         auc_metric = ROCAUCMetric()
         if pretrained:
             if type_net == 'dense':
@@ -37,10 +35,10 @@ class MyNeuralNetwork:
                     param.requires_grad = False
             if type_net == 'dense':
                 num_ftrs = net.class_layers.out.in_features
-                net.class_layers.out = torch.nn.Linear(num_ftrs, len(class_names)) #este tiene requires_grad=True
+                net.class_layers.out = torch.nn.Linear(num_ftrs, len(class_names)) #this one has requires_grad=True
             else:
                 num_ftrs = net._fc.in_features
-                net._fc = torch.nn.Linear(num_ftrs, len(class_names)) #este tiene requires_grad=True
+                net._fc = torch.nn.Linear(num_ftrs, len(class_names)) #this one has requires_grad=True
             net = net.to(device)
             if not finetune:
                 if type_net == 'dense':
@@ -75,13 +73,12 @@ class MyNeuralNetwork:
             else:
                 net = EfficientNetBN("efficientnet-b0", pretrained=False, spatial_dims=2, in_channels=3, num_classes=len(class_names)).to(device)
             optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-        #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=40, gamma=0.1) #Decays the learning rate of each parameter group by 0.1 every 40 epochs
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=40, gamma=0.1) #Decays the learning rate of each parameter group by 0.1 every 40 epochs
         
         # Tensorboard---------------------------------------------------------------------------
         dataiter = iter(train_loader) # get a random batch of training images of size batch_size
         images = dataiter.next()[0].to(device)
         # write to tensorboard
-#         writer.add_figure('some train images', tools.plot_grid(images))
         writer.add_graph(net, images) # visualize the model we built -> “Graphs”
         writer.flush()
 
@@ -142,7 +139,7 @@ class MyNeuralNetwork:
                 print(f"Epoch: {epoch + 1} lr: {optimizer.param_groups[0]['lr']} average loss: {epoch_loss:.4f} accuracy: {acc_metric:.4f}")
                 epoch_loss = 0.0
             
-            #scheduler.step()
+            scheduler.step()
 
         print("Testing")
         net.eval()
